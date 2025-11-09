@@ -1,5 +1,6 @@
 "use client";
 
+// Email/Password Authentication with Sign Up
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
