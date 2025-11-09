@@ -5,7 +5,7 @@ A comprehensive Training & Placement Cell Management System for Sikkim Manipal I
 ## 🌟 Features
 
 ### Authentication
-- **Email OTP Authentication** via Supabase Auth
+- **Email & Password Authentication** with Sign Up and Login
 - **Role-based Access Control** (Student, Teacher/Mentor, HOD)
 - Secure session management
 
