@@ -7,18 +7,14 @@ export default async function HomePage() {
 
   if (session) {
     // Redirect based on user role
-    const { data: profile } = await supabase
+    const { data: profiles } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', session.user.id)
-      .single();
+      .eq('id', session.user.id);
 
-    if (profile?.role === 'student') {
-      redirect('/dashboard/student');
-    } else if (profile?.role === 'teacher') {
-      redirect('/dashboard/teacher');
-    } else if (profile?.role === 'hod') {
-      redirect('/dashboard/hod');
+    if (profiles && profiles.length > 0) {
+      const role = profiles[0].role;
+      redirect(`/dashboard/${role}`);
     }
   }
 
