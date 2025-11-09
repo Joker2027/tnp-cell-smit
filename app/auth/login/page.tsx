@@ -75,34 +75,37 @@ export default function LoginPage() {
       if (error) throw error;
 
       if (data.user) {
-        // Wait a moment for Supabase to process the user
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // If user session exists (email confirmation disabled), create profile immediately
+        if (data.session) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .upsert({
+              id: data.user.id,
+              email: data.user.email!,
+              role: role,
+              full_name: fullName,
+            }, {
+              onConflict: 'id'
+            });
 
-        // Create profile using upsert to avoid conflicts
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: data.user.id,
-            email: data.user.email!,
-            role: role,
-            full_name: fullName,
-          }, {
-            onConflict: 'id'
-          });
-
-        if (profileError) {
-          console.error('Profile creation error:', profileError);
-          toast({
-            title: "Warning",
-            description: "Account created but profile setup incomplete. Please try logging in.",
-            variant: "destructive",
-          });
+          if (profileError) {
+            console.error('Profile creation error:', profileError);
+            toast({
+              title: "Warning",
+              description: "Account created but profile setup may be incomplete. Please try logging in.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Success!",
+              description: "Account created! You can now login.",
+            });
+          }
         } else {
+          // Email confirmation is enabled
           toast({
-            title: "Account created!",
-            description: data.session 
-              ? "You can now use the Login tab to access your account." 
-              : "Please check your email to verify your account, then login.",
+            title: "Check your email",
+            description: "We've sent you a verification link. Click it to activate your account.",
           });
         }
 
@@ -113,7 +116,7 @@ export default function LoginPage() {
       }
     } catch (error: any) {
       toast({
-        title: "Error",
+        title: "Signup failed",
         description: error.message,
         variant: "destructive",
       });
@@ -138,6 +141,9 @@ export default function LoginPage() {
       if (error) throw error;
 
       if (data.user) {
+        // Wait for session to be established
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         // Get user profile with role
         const { data: profiles, error: profileError } = await supabase
           .from('profiles')
@@ -146,55 +152,19 @@ export default function LoginPage() {
 
         if (profileError) {
           console.error('Profile fetch error:', profileError);
-          throw new Error("Error fetching profile. Please try again.");
         }
 
-        // If no profile exists, create a default one
+        // If no profile exists, we need to reload the page to let the session establish
         if (!profiles || profiles.length === 0) {
           toast({
-            title: "Profile Missing",
-            description: "Creating your profile... Please select your role.",
+            title: "Setting up profile...",
+            description: "Please wait, refreshing...",
           });
           
-          // Try to create a profile with default student role
-          const { error: createError } = await supabase
-            .from('profiles')
-            .insert({
-              id: data.user.id,
-              email: data.user.email!,
-              role: 'student', // Default role
-              full_name: data.user.email!.split('@')[0],
-            });
-          
-          if (createError) {
-            console.error('Profile creation error:', createError);
-            throw new Error("Profile not found. Please sign up again or contact administrator.");
-          }
-
-          // Fetch the newly created profile
-          const { data: newProfiles } = await supabase
-            .from('profiles')
-            .select('role, full_name')
-            .eq('id', data.user.id);
-          
-          if (!newProfiles || newProfiles.length === 0) {
-            throw new Error("Failed to create profile. Please contact administrator.");
-          }
-
-          const profile = newProfiles[0];
-          
-          setUser({
-            id: data.user.id,
-            email: data.user.email!,
-            role: profile.role,
-          });
-
-          toast({
-            title: "Success",
-            description: "Profile created and logged in!",
-          });
-
-          router.push(`/dashboard/${profile.role}`);
+          // Reload the page - middleware will handle the redirect
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1000);
           return;
         }
 

@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { GraduationCap, FileText, Award, LogOut } from "lucide-react";
+import { GraduationCap, FileText, Award, LogOut, User } from "lucide-react";
 
 export default function StudentDashboard() {
   const router = useRouter();
@@ -78,10 +78,24 @@ export default function StudentDashboard() {
   };
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    logout();
-    router.push("/auth/login");
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) throw error;
+      
+      // Clear local state
+      logout();
+      
+      // Force redirect to login
+      window.location.href = '/auth/login';
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to logout. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleProfileUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -239,6 +253,17 @@ export default function StudentDashboard() {
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+              <User className="h-4 w-4 text-gray-600 dark:text-gray-300" />
+              <div className="text-sm">
+                <p className="font-medium text-gray-900 dark:text-white">
+                  {studentData?.enrollment_number || 'Student'}
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-400">
+                  {user?.email?.split('@')[0] || 'User'}
+                </p>
+              </div>
+            </div>
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               Logout
@@ -359,105 +384,116 @@ export default function StudentDashboard() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="fathers_name">Father's Name</Label>
+                      <Label htmlFor="fathers_name">Father's Name *</Label>
                       <Input
                         id="fathers_name"
                         name="fathers_name"
                         defaultValue={studentData?.fathers_name}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="fathers_contact">Father's Contact</Label>
+                      <Label htmlFor="fathers_contact">Father's Contact *</Label>
                       <Input
                         id="fathers_contact"
                         name="fathers_contact"
                         defaultValue={studentData?.fathers_contact}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="fathers_occupation">Father's Occupation</Label>
+                      <Label htmlFor="fathers_occupation">Father's Occupation *</Label>
                       <Input
                         id="fathers_occupation"
                         name="fathers_occupation"
                         defaultValue={studentData?.fathers_occupation}
+                        required
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="mothers_name">Mother's Name</Label>
+                      <Label htmlFor="mothers_name">Mother's Name *</Label>
                       <Input
                         id="mothers_name"
                         name="mothers_name"
                         defaultValue={studentData?.mothers_name}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mothers_contact">Mother's Contact</Label>
+                      <Label htmlFor="mothers_contact">Mother's Contact *</Label>
                       <Input
                         id="mothers_contact"
                         name="mothers_contact"
                         defaultValue={studentData?.mothers_contact}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="mothers_occupation">Mother's Occupation</Label>
+                      <Label htmlFor="mothers_occupation">Mother's Occupation *</Label>
                       <Input
                         id="mothers_occupation"
                         name="mothers_occupation"
                         defaultValue={studentData?.mothers_occupation}
+                        required
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="tenth_percentage">10th Percentage</Label>
+                      <Label htmlFor="tenth_percentage">10th Percentage *</Label>
                       <Input
                         id="tenth_percentage"
                         name="tenth_percentage"
                         type="number"
                         step="0.01"
                         defaultValue={studentData?.tenth_percentage}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="tenth_board">10th Board</Label>
+                      <Label htmlFor="tenth_board">10th Board *</Label>
                       <Input
                         id="tenth_board"
                         name="tenth_board"
                         defaultValue={studentData?.tenth_board}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="tenth_year">10th Year</Label>
+                      <Label htmlFor="tenth_year">10th Year *</Label>
                       <Input
                         id="tenth_year"
                         name="tenth_year"
                         type="number"
                         defaultValue={studentData?.tenth_year}
+                        required
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="twelfth_percentage">12th Percentage</Label>
+                      <Label htmlFor="twelfth_percentage">12th Percentage *</Label>
                       <Input
                         id="twelfth_percentage"
                         name="twelfth_percentage"
                         type="number"
                         step="0.01"
                         defaultValue={studentData?.twelfth_percentage}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="twelfth_board">12th Board</Label>
+                      <Label htmlFor="twelfth_board">12th Board *</Label>
                       <Input
                         id="twelfth_board"
                         name="twelfth_board"
                         defaultValue={studentData?.twelfth_board}
+                        required
                       />
                     </div>
                     <div className="space-y-2">
