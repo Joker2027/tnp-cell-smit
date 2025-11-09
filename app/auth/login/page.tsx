@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/lib/store/auth-store";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Mail, CheckCircle } from "lucide-react";
+import { Lock, UserPlus, LogIn, Mail } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<"student" | "teacher" | "hod">("student");
-  const [emailSent, setEmailSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
@@ -43,90 +45,117 @@ export default function LoginPage() {
     };
 
     checkUser();
+  }, [router]);
 
-    // Listen for auth state changes (when user clicks magic link)
-    const supabase = createClient();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        // Get stored role or default
-        const storedRole = localStorage.getItem('pendingRole') as "student" | "teacher" | "hod" || "student";
-        
-        // Get or create profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-
-        const userRole = profile?.role || storedRole;
-
-        // Create profile if doesn't exist
-        if (!profile) {
-          await supabase.from("profiles").upsert({
-            id: session.user.id,
-            email: session.user.email,
-            role: userRole,
-            updated_at: new Date().toISOString(),
-          });
-        }
-
-        setUser({
-          id: session.user.id,
-          email: session.user.email!,
-          role: userRole,
-        });
-        
-        // Clear stored role
-        localStorage.removeItem('pendingRole');
-
-        toast({
-          title: "Success",
-          description: "Logged in successfully!",
-        });
-
-        router.push(`/dashboard/${userRole}`);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [router, setUser, toast]);
-
-  const handleMagicLinkLogin = async (e: React.FormEvent) => {
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       const supabase = createClient();
       
-      // Get the current URL for redirect
+      // Get redirect URL
       const redirectUrl = typeof window !== 'undefined' 
         ? `${window.location.origin}/auth/login`
         : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000') + '/auth/login';
 
-      const { error } = await supabase.auth.signInWithOtp({
+      // Sign up the user
+      const { data, error } = await supabase.auth.signUp({
         email,
+        password,
         options: {
-          shouldCreateUser: true,
           emailRedirectTo: redirectUrl,
-        },
+          data: {
+            full_name: fullName,
+            role: role,
+          }
+        }
       });
 
       if (error) throw error;
 
-      // Store role temporarily for when user returns
-      localStorage.setItem('pendingRole', role);
+      if (data.user) {
+        // Create profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: data.user.id,
+            email: data.user.email!,
+            role: role,
+            full_name: fullName,
+          });
 
-      setEmailSent(true);
-      
-      toast({
-        title: "Magic link sent!",
-        description: "Check your email and click the link to login.",
-      });
+        if (profileError) {
+          console.error('Profile creation error:', profileError);
+        }
+
+        toast({
+          title: "Account created!",
+          description: "Please check your email to verify your account, then you can login.",
+        });
+
+        // Clear form
+        setEmail("");
+        setPassword("");
+        setFullName("");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+
+      // Sign in with email and password
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        // Get user profile with role
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        if (!profile) {
+          throw new Error("Profile not found. Please contact administrator.");
+        }
+
+        setUser({
+          id: data.user.id,
+          email: data.user.email!,
+          role: profile.role,
+        });
+
+        toast({
+          title: "Success",
+          description: "Logged in successfully!",
+        });
+
+        // Redirect based on role
+        router.push(`/dashboard/${profile.role}`);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Login failed",
         description: error.message,
         variant: "destructive",
       });
@@ -149,77 +178,128 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {!emailSent ? (
-            <form onSubmit={handleMagicLinkLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="role">Select Role</Label>
-                <Select value={role} onValueChange={(value: any) => setRole(value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="student">Student</SelectItem>
-                    <SelectItem value="teacher">Teacher/Mentor</SelectItem>
-                    <SelectItem value="hod">HOD</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">
+                <LogIn className="mr-2 h-4 w-4" />
+                Login
+              </TabsTrigger>
+              <TabsTrigger value="signup">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Sign Up
+              </TabsTrigger>
+            </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your.email@smit.smu.edu.in"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">Email Address</Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="your.email@smit.smu.edu.in"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                <Mail className="mr-2 h-4 w-4" />
-                {loading ? "Sending..." : "Send Magic Link"}
-              </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="login-password">Password</Label>
+                  <Input
+                    id="login-password"
+                    type="password"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                </div>
 
-              <p className="text-xs text-center text-gray-600 dark:text-gray-400">
-                We'll send you a login link to your email
-              </p>
-            </form>
-          ) : (
-            <div className="space-y-4 text-center">
-              <div className="flex justify-center">
-                <CheckCircle className="h-16 w-16 text-green-500" />
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold">Check your email!</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  We've sent a magic link to:
-                </p>
-                <p className="text-sm font-medium">{email}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Click the link in the email to login instantly.
-                </p>
-              </div>
-
-              <div className="pt-4 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => {
-                    setEmailSent(false);
-                    setEmail("");
-                  }}
-                >
-                  Use different email
+                <Button type="submit" className="w-full" disabled={loading}>
+                  <Lock className="mr-2 h-4 w-4" />
+                  {loading ? "Logging in..." : "Login"}
                 </Button>
-              </div>
-            </div>
-          )}
+
+                <p className="text-xs text-center text-gray-600 dark:text-gray-400">
+                  Don't have an account? Switch to Sign Up tab
+                </p>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signup-name">Full Name</Label>
+                  <Input
+                    id="signup-name"
+                    type="text"
+                    placeholder="Your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="signup-role">Select Role</Label>
+                  <Select value={role} onValueChange={(value: any) => setRole(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="teacher">Teacher/Mentor</SelectItem>
+                      <SelectItem value="hod">HOD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email Address</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="your.email@smit.smu.edu.in"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Password</Label>
+                  <Input
+                    id="signup-password"
+                    type="password"
+                    placeholder="Create a strong password (min 6 characters)"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    minLength={6}
+                    required
+                  />
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  {loading ? "Creating account..." : "Create Account"}
+                </Button>
+
+                <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-xs text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                    <Mail className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <span>
+                      After signing up, you'll receive a verification email. 
+                      Click the link to verify your account before logging in.
+                    </span>
+                  </p>
+                </div>
+              </form>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
   );
 }
+
