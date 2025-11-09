@@ -66,13 +66,13 @@ export default function StudentDashboard() {
         setNocData(noc);
 
         // Fetch evaluation data
-        const { data: eval } = await supabase
+        const { data: evalData } = await supabase
           .from('evaluations')
           .select('*')
           .eq('student_id', student.id)
           .single();
 
-        setEvaluation(eval);
+        setEvaluation(evalData);
       }
     }
   };
