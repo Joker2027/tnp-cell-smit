@@ -33,14 +33,13 @@ export default function LoginPage() {
       
       if (user) {
         // Get user's role from profile
-        const { data: profile } = await supabase
+        const { data: profiles } = await supabase
           .from("profiles")
           .select("role")
-          .eq("id", user.id)
-          .single();
+          .eq("id", user.id);
 
-        if (profile?.role) {
-          router.push(`/dashboard/${profile.role}`);
+        if (profiles && profiles.length > 0) {
+          router.push(`/dashboard/${profiles[0].role}`);
         }
       }
     };
@@ -76,14 +75,16 @@ export default function LoginPage() {
       if (error) throw error;
 
       if (data.user) {
-        // Create profile
+        // Create profile using upsert to avoid conflicts
         const { error: profileError } = await supabase
           .from('profiles')
-          .insert({
+          .upsert({
             id: data.user.id,
             email: data.user.email!,
             role: role,
             full_name: fullName,
+          }, {
+            onConflict: 'id'
           });
 
         if (profileError) {
@@ -92,7 +93,7 @@ export default function LoginPage() {
 
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account, then you can login.",
+          description: data.session ? "You can now login with your credentials." : "Please check your email to verify your account, then login.",
         });
 
         // Clear form
@@ -128,17 +129,21 @@ export default function LoginPage() {
 
       if (data.user) {
         // Get user profile with role
-        const { data: profile, error: profileError } = await supabase
+        const { data: profiles, error: profileError } = await supabase
           .from('profiles')
           .select('role, full_name')
-          .eq('id', data.user.id)
-          .single();
+          .eq('id', data.user.id);
 
-        if (profileError) throw profileError;
+        if (profileError) {
+          console.error('Profile fetch error:', profileError);
+          throw new Error("Error fetching profile. Please try again.");
+        }
 
-        if (!profile) {
+        if (!profiles || profiles.length === 0) {
           throw new Error("Profile not found. Please contact administrator.");
         }
+
+        const profile = profiles[0];
 
         setUser({
           id: data.user.id,
